@@ -387,7 +387,7 @@ textarea.bk{width:100%;min-height:90px;font-family:var(--mono);font-size:12px;ba
   <h2>Análisis de planos DXF</h2>
   <p class="lead">Sube la planta en formato DXF (desde AutoCAD: Guardar como → DXF de AutoCAD 2018). El asistente lee capas, polilíneas, arcos y textos, mide superficies, distanciamientos, anchos de puertas y estacionamientos, y contrasta con los parámetros del CIP y la OGUC. Las observaciones se exportan como un DXF de marcas para superponer en AutoCAD, corregir y volver a verificar.</p>
   <div class="panel drop" id="drop" tabindex="0" role="button" aria-label="Subir archivo DXF">
-    <input type="file" id="dxf-file" accept=".dxf,.dwg,.DXF,.DWG">
+    <input type="file" id="dxf-file">
     <div class="big">Arrastra aquí el plano o haz clic para elegirlo</div>
     <div class="sub">DXF ASCII (recomendado). Los archivos DWG son binarios y deben exportarse a DXF desde AutoCAD, BricsCAD o el conversor gratuito ODA File Converter.</div>
   </div>
@@ -507,10 +507,12 @@ textarea.bk{width:100%;min-height:90px;font-family:var(--mono);font-size:12px;ba
 <section class="view" id="v-remodelar" hidden>
   <h2>Remodelar con una foto</h2>
   <p class="lead">Saca una foto de la fachada, el patio o un recinto. Prueba cambios al instante en tu navegador (pintar muros y pisos conservando las sombras, materiales, estilos), pide un render fotorrealista con tus instrucciones, y obtén la ficha de remodelación con los trámites y normas que implica cada cambio.</p>
-  <div class="panel drop" id="rdrop" tabindex="0" role="button" aria-label="Sacar o subir foto">
-    <input type="file" id="rm-file" accept="image/*" capture="environment">
-    <div class="big">Saca una foto o arrastra una imagen</div>
-    <div class="sub">JPG o PNG. Se reduce a 1600 px para procesarla en el navegador; la foto sólo sale de tu equipo si pides un render con IA.</div>
+  <div class="panel drop" id="rdrop" tabindex="0" role="button" aria-label="Elegir una imagen">
+    <input type="file" id="rm-file" accept="image/*">
+    <input type="file" id="rm-cam" accept="image/*" capture="environment">
+    <div class="big">Elige una imagen o arrástrala aquí</div>
+    <div class="sub">JPG o PNG desde la galería o el explorador. Se reduce a 1600 px para procesarla en el navegador; la foto sólo sale de tu equipo si pides un render con IA.</div>
+    <div class="toolbar no-print" style="justify-content:center;margin:12px 0 0"><button class="btn" type="button" id="rm-btn-gal">Elegir de la galería</button><button class="btn sec" type="button" id="rm-btn-cam">Sacar foto con la cámara</button></div>
   </div>
 
   <div id="rm-body" hidden>
@@ -1142,6 +1144,7 @@ function fillFrente(){ const sel=$("#pp-frente"); const pred=dedupe(closedPolys(
 /* --- carga --- */
 function loadFile(file){
   if(!file) return; P.file=file.name;
+  if(!/\.(dxf|dwg)$/i.test(file.name)){ status("<b>"+esc(file.name)+"</b> no es un archivo DXF ni DWG. Elige el plano exportado desde AutoCAD como <b>.dxf</b>.",true); return; }
   if(/\.dwg$/i.test(file.name)){ status("<b>"+esc(file.name)+"</b> es un DWG (binario). Exporta desde AutoCAD con <b>GUARDARCOMO → DXF de AutoCAD 2018</b> (o usa ODA File Converter) y sube el .dxf.",true); return; }
   const rd=new FileReader(); rd.onload=()=>{ const txt=rd.result; if(/^AutoCAD Binary DXF/.test(txt)){ status("Es un DXF binario. Guárdalo como DXF ASCII desde AutoCAD (Opciones → Formato ASCII).",true); return; } try{ analyzeText(txt); }catch(err){ status("No se pudo leer el archivo: "+esc(err.message),true); } };
   rd.readAsText(file,"latin1");
@@ -1492,9 +1495,10 @@ $("#rm-estilo").addEventListener("change",e=>{ RM.estilo=e.target.value; rmUI();
 document.body.addEventListener("click",e=>{ const b=e.target.closest("#rm-pal button,#rm-arm button"); if(b){ $("#rm-color").value=b.dataset.hex; if(b.dataset.m){ RM.mat=b.dataset.m; document.querySelectorAll("#rm-mat button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.mat===RM.mat)); } return; } const m=e.target.closest("#rm-mat button"); if(m){ RM.mat=m.dataset.mat; document.querySelectorAll("#rm-mat button").forEach(x=>x.setAttribute("aria-pressed",x===m)); return; } const q=e.target.closest("#ia-rm-quick button"); if(q){ const t=$("#ia-rm-txt"); t.value=(t.value.trim()?t.value.trim().replace(/[.;]?$/,"; "):"")+q.dataset.q; return; } });
 $("#rm-chips").addEventListener("change",rmNorm);
 function rmNorm(){ const ids=[...document.querySelectorAll("#rm-chips input:checked")].map(i=>i.dataset.ch); $("#rm-norm").innerHTML=ids.map(id=>{ const c=CAMBIOS.find(x=>x.id===id); return `<div class="obs info"><div class="num">§</div><div><b>${esc(c.n)}</b><small>${esc(c.tr)}</small><small><b>Documentos:</b> ${esc(c.doc)}</small><small>${c.no.map(chipN).join(" ")}</small></div></div>`; }).join("")||'<p class="lead" style="font-size:13px">Marca al menos un tipo de intervención.</p>'; }
-const rdrop=$("#rdrop"), rmIn=$("#rm-file");
-rdrop.addEventListener("click",e=>{ if(e.target===rmIn) return; rmIn.click(); }); rdrop.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); rmIn.click(); } });
-rmIn.addEventListener("change",()=>{ rmLoad(rmIn.files[0]); rmIn.value=""; });
+const rdrop=$("#rdrop"), rmIn=$("#rm-file"), rmCam=$("#rm-cam");
+rdrop.addEventListener("click",e=>{ if(e.target===rmIn||e.target===rmCam||e.target.closest("button")) return; rmIn.click(); }); rdrop.addEventListener("keydown",e=>{ if((e.key==="Enter"||e.key===" ")&&e.target===rdrop){ e.preventDefault(); rmIn.click(); } });
+$("#rm-btn-gal").addEventListener("click",()=>rmIn.click()); $("#rm-btn-cam").addEventListener("click",()=>rmCam.click());
+rmIn.addEventListener("change",()=>{ rmLoad(rmIn.files[0]); rmIn.value=""; }); rmCam.addEventListener("change",()=>{ rmLoad(rmCam.files[0]); rmCam.value=""; });
 ["dragenter","dragover"].forEach(ev=>rdrop.addEventListener(ev,e=>{ e.preventDefault(); rdrop.classList.add("over"); })); ["dragleave","drop"].forEach(ev=>rdrop.addEventListener(ev,e=>{ e.preventDefault(); rdrop.classList.remove("over"); }));
 rdrop.addEventListener("drop",e=>{ rmLoad(e.dataTransfer.files&&e.dataTransfer.files[0]); });
 
