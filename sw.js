@@ -1,6 +1,6 @@
 /* Service worker del Asistente Normativo: guarda la app para usarla sin conexión.
    Al cambiar cualquier archivo, sube VERSION para que los teléfonos reciban la nueva copia. */
-const VERSION = "v2";
+const VERSION = "v3";
 const CACHE = "asistente-normativo-" + VERSION;
 const ARCHIVOS = [
   "./", "./index.html", "./manifest.json",
